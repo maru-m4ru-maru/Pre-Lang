@@ -6,7 +6,7 @@ Pre は、JavaScript に似た書き方と Python のような読みやすさを
 
 Pre は、値・変数・関数・クラス・パターンマッチ・型注釈・パイプ・描画など、一般的なプログラミングに必要な機能を小さな言語の中にまとめています。
 
-現在の実装バージョンは **1.1.1** です。
+現在の実装バージョンは **2.0.0** です。
 
 ## Contents
 
@@ -20,6 +20,7 @@ Pre は、値・変数・関数・クラス・パターンマッチ・型注釈�
 - [パターンマッチ](#パターンマッチ)
 - [エラー処理](#エラー処理)
 - [型注釈](#型注釈)
+- [Selector Expression](#selector-expression)
 - [パイプ](#パイプ)
 - [描画](#描画)
 - [JavaScript・Python との違い](#javascriptpython-との違い)
@@ -28,6 +29,44 @@ Pre は、値・変数・関数・クラス・パターンマッチ・型注釈�
 - [JavaScript から使う](#javascript-から使う)
 
 ---
+
+## Selector Expression
+
+Pre 2.0.0 では、データ処理のための「Selector Expression」を追加しました。
+
+`.` から始まる式は、「現在の要素」を対象にした短い関数として使えます。
+
+```pre
+const users = [
+  { name: "bob", age: 20 },
+  { name: "alice", age: 17 },
+  { name: "carol", age: 31 }
+]
+
+const adults = users
+  |> .filter(.age >= 18)
+  |> .map(.name.upper())
+  |> .sort()
+
+print(adults.join(", "))
+```
+
+この例の `filter(.age >= 18)` は、毎回 `user => user.age >= 18` と書く必要がありません。
+`.name` はプロパティ取得、`.name.upper()` はメソッド呼び出しまで表現できます。
+
+Selector Expression は通常の高階関数にも使えます。
+
+```pre
+print(map(users, .name).join(" - "))
+```
+
+さらに比較や計算もそのまま書けます。
+
+```pre
+const expensive = items |> .filter(.price * .count >= 10000)
+```
+
+Pre 2.0.0 のパイプは、この記法を中心に設計されています。
 
 ## 値と変数
 
@@ -693,9 +732,9 @@ let either: number | string = "ok"
 const words = ["pre", "is", "a", "small", "language"]
 
 const out = words
-  |> filter(w => len(w) > 2)
-  |> map(w => w.upper())
-  |> sorted
+  |> .filter(.length > 2)
+  |> .map(.upper())
+  |> .sort()
 
 print(out)
 ```
