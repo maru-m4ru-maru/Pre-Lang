@@ -34,7 +34,7 @@ test("strings and templates work", () => {
 const name = "Pre"
 print(f"Hello {name} {2 + 3}")
 print(name.upper())
-`), "Hello Pre 5\nvalue: Pre\n");
+`), "Hello Pre 5\nPRE\n");
 });
 
 test("functions and default arguments work", () => {
@@ -92,8 +92,11 @@ test("maps and spread work", () => {
   assert.equal(run(`
 const base = { name: "Pre", version: 1 }
 const merged = { ...base, version: 2 }
+
+fn total(...values) => sum(values)
+
 print(merged.name, merged.version)
-print(sum(...[1, 2, 3]))
+print(total(...[1, 2, 3]))
 `), "Pre 2\n6\n");
 });
 
@@ -243,7 +246,7 @@ test("selector expressions work inside comparisons and calculations", () => {
 const values = [
   { score: 4, count: 3 },
   { score: 9, count: 2 },
-  { score: 2, count: 10 }
+  { score: 2, count: 8 }
 ]
 
 print(values |> .filter(.score * .count >= 18) |> .map(.score) |> .join(","))
