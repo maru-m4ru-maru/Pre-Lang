@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '1.1.1';
+  const VERSION = '2.0.0';
   const MAX_DEPTH = 1000;
 
   /* ═════════════ 値とエラー ═════════════ */
@@ -908,17 +908,40 @@
       this.expectOp('(');
       const args = [];
       this.skipNl();
+
       while (!this.isOp(')')) {
         const t = this.tok;
-        if (this.eatOp('...')) args.push({ t: 'Spread', arg: this.parseAssign(), line: t.line, col: t.col });
-        else args.push(this.parseAssign());
+
+        if (this.eatOp('...')) {
+          args.push({
+            t: 'Spread',
+            arg: this.parseAssign(),
+            line: t.line,
+            col: t.col
+          });
+        } else {
+          let arg = this.parseAssign();
+
+          if (arg.t !== 'Call' && arg.t !== 'Pipe' && arg.t !== 'Fn') {
+            arg = this.liftSelector(arg);
+          }
+
+          args.push(arg);
+        }
+
         this.skipNl();
-        if (!this.eatOp(',')) break;
+
+        if (!this.eatOp(',')) {
+          break;
+        }
+
         this.skipNl();
       }
+
       this.expectOp(')', "関数呼び出しの ')'");
       return args;
     }
+
     parseIndexRest(obj, optional) {
       const open = this.next();
       let start = null, end = null, isSlice = false;
@@ -973,6 +996,167 @@
       return e;
     }
 
+    parseSelector() {
+      const start = this.next();
+      const steps = [];
+
+      for (;;) {
+        const name = this.tok;
+
+        if (name.t !== 'id' && name.t !== 'kw') {
+          this.fail(`プロパティ名が必要ですが、${this.desc(name)} が見つかりました`);
+        }
+
+        this.next();
+
+        const args = this.isOp('(') ? this.parseArgs() : null;
+
+        steps.push({
+          prop: name.v,
+          args,
+          line: name.line,
+          col: name.col
+        });
+
+        if (!this.eatOp('.')) {
+          break;
+        }
+      }
+
+      return {
+        t: 'Accessor',
+        steps,
+        line: start.line,
+        col: start.col
+      };
+    }
+
+    selectorToExpr(accessor, paramName) {
+      let expr = {
+        t: 'Id',
+        name: paramName,
+        line: accessor.line,
+        col: accessor.col
+      };
+
+      for (const step of accessor.steps) {
+        expr = {
+          t: 'Member',
+          obj: expr,
+          prop: step.prop,
+          optional: false,
+          line: step.line,
+          col: step.col
+        };
+
+        if (step.args) {
+          expr = {
+            t: 'Call',
+            callee: expr,
+            args: step.args,
+            optional: false,
+            line: step.line,
+            col: step.col
+          };
+        }
+      }
+
+      return expr;
+    }
+
+    containsSelector(node) {
+      if (!node || typeof node !== 'object') {
+        return false;
+      }
+
+      if (node.t === 'Accessor') {
+        return true;
+      }
+
+      if (node.t === 'Fn') {
+        return false;
+      }
+
+      for (const key of Object.keys(node)) {
+        if (key === 't' || key === 'line' || key === 'col') {
+          continue;
+        }
+
+        const value = node[key];
+
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (this.containsSelector(item)) {
+              return true;
+            }
+          }
+        } else if (value && typeof value === 'object') {
+          if (this.containsSelector(value)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    replaceSelectors(node, paramName) {
+      if (!node || typeof node !== 'object') {
+        return node;
+      }
+
+      if (node.t === 'Accessor') {
+        return this.selectorToExpr(node, paramName);
+      }
+
+      if (node.t === 'Fn') {
+        return node;
+      }
+
+      for (const key of Object.keys(node)) {
+        if (key === 't' || key === 'line' || key === 'col') {
+          continue;
+        }
+
+        const value = node[key];
+
+        if (Array.isArray(value)) {
+          node[key] = value.map((item) => this.replaceSelectors(item, paramName));
+        } else if (value && typeof value === 'object') {
+          node[key] = this.replaceSelectors(value, paramName);
+        }
+      }
+
+      return node;
+    }
+
+    liftSelector(node) {
+      if (!this.containsSelector(node)) {
+        return node;
+      }
+
+      const param = '__pre_item';
+
+      return {
+        t: 'Fn',
+        name: '',
+        params: [{
+          name: param,
+          type: null,
+          def: null,
+          rest: false,
+          line: node.line || 1
+        }],
+        body: this.replaceSelectors(node, param),
+        exprBody: true,
+        retType: null,
+        minArgs: 1,
+        maxArgs: 1,
+        line: node.line,
+        col: node.col
+      };
+    }
+
     parsePrimary() {
       const t = this.tok;
       switch (t.t) {
@@ -987,7 +1171,9 @@
           });
           return { t: 'Tpl', parts, line: t.line, col: t.col };
         }
-        case 'id': this.next(); return { t: 'Id', name: t.v, line: t.line, col: t.col };
+        case 'id':
+          this.next();
+          return { t: 'Id', name: t.v, line: t.line, col: t.col };
         case 'kw':
           switch (t.v) {
             case 'true': this.next(); return { t: 'Lit', v: true, line: t.line, col: t.col };
@@ -1003,6 +1189,10 @@
           }
           break;
         case 'op':
+          if (t.v === '.') {
+            return this.parseSelector();
+          }
+
           if (t.v === '(') {
             this.next(); this.skipNl();
             const e = this.parseExpr();
@@ -1777,6 +1967,7 @@ class EOFError extends Error {}
         case 'ListComp': return this.evComp(n, env);
         case 'Map': return this.evMap(n, env);
         case 'Fn': return this.makeFn(n, env);
+        case 'Accessor': return this.evSelector(n, env);
         case 'Unary': return this.evUnary(n, env);
         case 'Slice': return this.evSlice(n, env);
         case 'Chain': return this.evChain(n, env);
@@ -1788,6 +1979,25 @@ class EOFError extends Error {}
       }
     }
     evChain(n, env) { const r = this.ev(n.expr, env); return r === SHORT ? null : r; }
+    evSelector(n, env) {
+      const fn = (value) => {
+        let current = value;
+
+        for (const step of n.steps) {
+          current = this.getMember(current, step.prop, n);
+
+          if (step.args) {
+            current = this.call(current, this.evArgs(step.args, env), n);
+          }
+        }
+
+        return current;
+      };
+
+      fn.preName = 'selector';
+      return fn;
+    }
+
     evTpl(n, env) {
       let s = '';
       const ps = n.parts;
