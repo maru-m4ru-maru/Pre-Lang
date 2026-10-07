@@ -20,7 +20,7 @@ test("basic expressions stay readable", () => {
 const price = 1200
 const tax = 0.1
 print(price * (1 + tax))
-`), "1320");
+`), "1320\n");
 });
 
 test("functions and default arguments work", () => {
@@ -28,7 +28,7 @@ test("functions and default arguments work", () => {
 fn greet(name, suffix = "!") => "Hello " + name + suffix
 print(greet("Pre"))
 print(greet("Pre", "."))
-`), "Hello Pre!\nHello Pre.");
+`), "Hello Pre!\nHello Pre.\n");
 });
 
 test("classes and methods work", () => {
@@ -42,7 +42,7 @@ class User {
 }
 
 print(User("maru").hello())
-`), "Hello maru");
+`), "Hello maru\n");
 });
 
 test("match remains concise", () => {
@@ -88,7 +88,7 @@ const users = [
 ]
 
 print(map(users, .name).join("-"))
-`), "A-B-C");
+`), "A-B-C\n");
 });
 
 test("selector chains support methods and properties", () => {
@@ -100,7 +100,7 @@ print(
     |> .map(.trim().upper())
     |> .join(", ")
 )
-`), "PRE, LANG, V2");
+`), "PRE, LANG, V2\n");
 });
 
 test("selector expressions work inside comparisons", () => {
@@ -112,14 +112,14 @@ const values = [
 ]
 
 print(values |> .filter(.score >= 5) |> .map(.score) |> .join(","))
-`), "9");
+`), "9\n");
 });
 
 test("optional chaining still works", () => {
   assert.equal(run(`
 let user = null
 print(user?.name ?? "guest")
-`), "guest");
+`), "guest\n");
 });
 
 test("errors still return structured results", () => {
