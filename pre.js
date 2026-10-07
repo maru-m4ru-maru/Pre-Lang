@@ -921,7 +921,11 @@
           });
         } else {
           let arg = this.parseAssign();
-          arg = this.liftSelector(arg);
+
+          if (arg.t !== 'Call' && arg.t !== 'Pipe' && arg.t !== 'Fn') {
+            arg = this.liftSelector(arg);
+          }
+
           args.push(arg);
         }
 
