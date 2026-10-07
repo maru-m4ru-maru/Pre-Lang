@@ -33,7 +33,7 @@ test("strings and templates work", () => {
   assert.equal(run(`
 const name = "Pre"
 print(f"Hello {name} {2 + 3}")
-print(`value: ${name}`)
+print(name.upper())
 `), "Hello Pre 5\nvalue: Pre\n");
 });
 
