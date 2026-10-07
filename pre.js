@@ -1169,11 +1169,6 @@
         }
         case 'id':
           this.next();
-
-          if (t.v === '.') {
-            return this.parseSelector();
-          }
-
           return { t: 'Id', name: t.v, line: t.line, col: t.col };
         case 'kw':
           switch (t.v) {
